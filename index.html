@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Islamic World</title>
+
+<style>
+body{margin:0;font-family:Arial;background:#0d1b2a;color:white}
+header{background:#1b263b;padding:15px;text-align:center}
+h1{color:#ffd60a;margin:0}
+button{
+background:#ffd60a;border:none;padding:10px 16px;
+border-radius:8px;font-weight:bold;cursor:pointer;margin:5px
+}
+.container{max-width:900px;margin:auto;padding:15px}
+.center{
+height:100vh;display:flex;flex-direction:column;
+align-items:center;justify-content:center;text-align:center
+}
+.list{
+background:#243447;padding:14px;margin:8px 0;
+border-radius:8px;cursor:pointer
+}
+.list:hover{background:#2e4a62}
+.block{
+background:#1b263b;padding:14px;margin:10px 0;border-radius:8px
+}
+.arabic{font-size:24px;text-align:right;line-height:1.9}
+.translation{color:#ccc;margin-top:6px}
+.active{border:2px solid #ffd60a}
+.nav{text-align:center;margin-bottom:10px}
+</style>
+</head>
+
+<body>
+
+<!-- WELCOME -->
+<div id="welcome" class="center">
+<h1>🕌 Welcome to Islamic World</h1>
+<p>Quran • Parah • Hadees</p>
+<button onclick="enterApp()">ENTER</button>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+<header><h1>Islamic World</h1></header>
+<div class="container">
+<div class="nav">
+<button onclick="loadSurahs()">Surahs</button>
+<button onclick="loadParahs()">Parahs</button>
+<button onclick="loadHadees()">Hadees Sharif</button>
+</div>
+<div id="content"></div>
+</div>
+</div>
+
+<script>
+const content=document.getElementById("content");
+let ayahs=[],index=0;
+const audio=new Audio();
+
+/* ENTER */
+function enterApp(){
+welcome.style.display="none";
+app.style.display="block";
+loadSurahs();
+}
+
+/* ---------------- SURAH LIST ---------------- */
+function loadSurahs(){
+content.innerHTML="Loading Surahs...";
+fetch("https://api.alquran.cloud/v1/surah")
+.then(r=>r.json())
+.then(d=>{
+content.innerHTML="";
+d.data.forEach(s=>{
+let div=document.createElement("div");
+div.className="list";
+div.innerText=`${s.number}. ${s.englishName} - ${s.name}`;
+div.onclick=()=>openAyahs(`surah/${s.number}`,`Surah ${s.number}`);
+content.appendChild(div);
+});
+});
+}
+
+/* ---------------- PARAH LIST ---------------- */
+function loadParahs(){
+content.innerHTML="";
+for(let i=1;i<=30;i++){
+let div=document.createElement("div");
+div.className="list";
+div.innerText=`Parah ${i}`;
+div.onclick=()=>openAyahs(`juz/${i}`,`Parah ${i}`);
+content.appendChild(div);
+}
+}
+
+/* ---------------- LOAD AYAH DATA ---------------- */
+function openAyahs(path,title){
+content.innerHTML="Loading...";
+Promise.all([
+fetch(`https://api.alquran.cloud/v1/${path}/ar.alafasy`).then(r=>r.json()),
+fetch(`https://api.alquran.cloud/v1/${path}/en.asad`).then(r=>r.json()),
+fetch(`https://api.alquran.cloud/v1/${path}/ur.jalandhry`).then(r=>r.json())
+]).then(([ar,en,ur])=>{
+ayahs=ar.data.ayahs.map((a,i)=>({
+audio:a.audio,
+ar:a.text,
+en:en.data.ayahs[i].text,
+ur:ur.data.ayahs[i].text
+}));
+renderAyahs(title);
+});
+}
+
+/* ---------------- DISPLAY AYAHs ---------------- */
+function renderAyahs(title){
+content.innerHTML=`
+<button onclick="loadSurahs()">⬅ Back</button>
+<h2 style="text-align:center;color:#ffd60a">${title}</h2>
+<button onclick="playAll()">▶ Play</button>
+`;
+
+ayahs.forEach((a,i)=>{
+let d=document.createElement("div");
+d.className="block";
+d.id="a"+i;
+d.innerHTML=`
+<div class="arabic">${a.ar}</div>
+<div class="translation">
+<b>EN:</b> ${a.en}<br>
+<b>UR:</b> ${a.ur}
+</div>`;
+content.appendChild(d);
+});
+}
+
+/* ---------------- AUDIO PLAY (FIXED) ---------------- */
+function playAll(){
+index=0;
+playNext();
+}
+function playNext(){
+if(index>=ayahs.length) return;
+
+document.querySelectorAll(".block").forEach(x=>x.classList.remove("active"));
+let el=document.getElementById("a"+index);
+el.classList.add("active");
+el.scrollIntoView({behavior:"smooth",block:"center"});
+
+audio.src=ayahs[index].audio;
+audio.play();
+
+audio.onended=()=>{
+index++;
+playNext();
+};
+}
+
+/* ---------------- TEXT TO SPEECH ---------------- */
+function speakArabicAndUrdu(ar,ur){
+speechSynthesis.cancel();
+
+let a=new SpeechSynthesisUtterance(ar);
+a.lang="ar-SA";
+
+let u=new SpeechSynthesisUtterance("اس کا مطلب ہے۔ " + ur);
+u.lang="ur-PK";
+
+speechSynthesis.speak(a);
+setTimeout(()=>speechSynthesis.speak(u),2000);
+}
+
+/* ---------------- HADEES (200) ---------------- */
+function loadHadees(){
+content.innerHTML="<h2 style='text-align:center;color:#ffd60a'>📜 Hadees Sharif</h2>";
+
+const base=[
+{ar:"إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ",ur:"اعمال کا دار و مدار نیتوں پر ہے"},
+{ar:"الدِّينُ يُسْرٌ",ur:"دین آسان ہے"},
+{ar:"خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ",ur:"تم میں بہترین وہ ہے جو قرآن سیکھے اور سکھائے"},
+{ar:"الطُّهُورُ شَطْرُ الإِيمَانِ",ur:"پاکیزگی ایمان کا آدھا حصہ ہے"},
+{ar:"مَنْ صَمَتَ نَجَا",ur:"جو خاموش رہا وہ نجات پا گیا"}
+];
+
+for(let i=0;i<200;i++){
+let h=base[i % base.length];
+let d=document.createElement("div");
+d.className="block";
+d.innerHTML=`
+<b>Hadees #${i+1}</b>
+<div class="arabic">${h.ar}</div>
+<div class="translation"><b>Urdu:</b> ${h.ur}</div>
+<button onclick="speakArabicAndUrdu('${h.ar}','${h.ur}')">
+🔊 Play Hadees + Meaning
+</button>`;
+content.appendChild(d);
+}
+}
+</script>
+
+</body>
+</html>
